@@ -1,0 +1,332 @@
+<script runat=server>
+  Platform.Load("core","1.1.1");
+
+  //Security headers to secure the page
+  HTTPHeader.SetValue("Access-Control-Allow-Methods","POST, GET");
+  HTTPHeader.SetValue("Access-Control-Allow-Origin","*");
+  Platform.Response.SetResponseHeader("Strict-Transport-Security","max-age=200");
+  Platform.Response.SetResponseHeader("X-XSS-Protection","1; mode=block");
+  Platform.Response.SetResponseHeader("X-Content-Type-Options","nosniff");
+  Platform.Response.SetResponseHeader("Referrer-Policy","strict-origin-when-cross-origin");
+
+  //Gather the referrer url
+  var referrer = Platform.Request.ReferrerURL;
+
+  //Verifies that this site is being called from within SFMC
+  //Pay attention to this as if they change the domain, this will break and toss an error
+  if (referrer.indexOf('exacttarget.com') < 0) {
+    throw error;
+  }
+
+  //App information, including REST API info
+  var appURL = '{{urlOfCloudPage}}';
+  var clientID = '{{clientID}}';
+  var clientSecret = '{{clientSecret}}';
+  var tenantID = '{{tenantSubDomain}}';
+
+  //Gather state parameter from URL
+  var state = Platform.Request.GetQueryStringParameter('state');
+
+  //Validate if authorized
+  if (state) {
+
+    var code = Platform.Request.GetQueryStringParameter('code');
+
+    var payloadObj = {
+        grant_type: 'authorization_code',
+        code: code,
+        client_id: clientID,
+        client_secret: clientSecret,
+        redirect_uri: appURL
+    };
+
+    //Gets Token if already Authorized
+    var res = HTTP.Post('https://' + tenantID + '.auth.marketingcloudapis.com/v2/token', 'application/json', Stringify(payloadObj));
+
+    var resJSON = Platform.Function.ParseJSON(res.Response[0]);
+    var accessToken = resJSON.access_token;
+    var authToken = 'Bearer ' + accessToken;
+
+  } else {
+    state = GUID();
+    Platform.Response.Redirect('https://' + tenantID + '.auth.marketingcloudapis.com/v2/authorize?response_type=code&client_id=' + clientID + '&redirect_uri=' + appURL + '&state=' + state);
+    //Authorizes request if not already authorized
+  } 
+
+  //Sets as global var for final JSON variable
+  var payload = {};
+  payload.data = [];
+
+
+  //set Expire value for auto lookback
+  var expire = new Date()
+  expire.setMonth(expire.getMonth() - 5)
+  //5 months subtraction because month is 0 index, meaning 0 is Jansuaray in getMonth, but setMonth will see Jan as 1.
+
+  var autos = getAutomations(tenantID,authToken);
+  var items = autos.entry;
+
+  var c = 0;
+
+  while(c < items.length) {
+
+    var a = items[c]
+
+    //Auto Object for pushing into payload data array - resets to null on each loop
+    autoObj = {};
+
+    var start = new Date(a.startTime)
+    var completed = new Date(a.completedTime)
+    var delta = Math.abs(completed.getTime() - start.getTime()) / 1000
+
+    // calculate (and subtract) whole days
+    var days = Math.floor(delta / 86400);
+    delta -= days * 86400;
+
+    // calculate (and subtract) whole hours
+    var hours = Math.floor(delta / 3600) % 24;
+    delta -= hours * 3600;
+
+    // calculate (and subtract) whole minutes
+    var minutes = Math.floor(delta / 60) % 60;
+    delta -= minutes * 60;
+
+    // what's left is seconds
+    var seconds = Math.floor(delta % 60);
+
+    var diff = (hours > 0 ? hours + 'hrs ': '') + (minutes > 0 ? minutes + ' mins ' : '') + seconds + ' secs';
+
+    //Validates if 
+    //the automation was run in past 6 months
+    //the automation was modified in past 6 months and was not run but has schedule type defined.
+    if ((new Date(a.lastRunTime) > expire) || (new Date(a.modifiedDate) > expire && a.lastRunDate === undefined && a.automationType != 'unspecified')) {
+
+     //set each date into a date data type
+     var modDate = new Date(a.modifiedDate)
+     var lastRunDate = new Date(a.lastRunTime)
+     var nextRunDate = new Date(a.scheduledTime)
+      
+     //add each key/value pair into autoObj
+     autoObj.AutoID = a.id;
+     autoObj.ClientID = a.clientId;
+     autoObj.Name = a.name;
+     autoObj.Status = a.status;
+     autoObj.modifiedDate = formatDate(modDate);
+     autoObj.LastRunDate = a.lastRunStatus === undefined? '' : formatDate(lastRunDate);
+     autoObj.StepCount = a.processes ? a.processes.length : 0;
+     autoObj.Type = a.automationType;
+     autoObj.LastRunStatus = a.lastRunStatus;
+     autoObj.lastRunDuration = diff != '0 secs' ? diff : '';
+     autoObj.NextRun = formatDate(nextRunDate);
+     
+     //push autoObj into the data array
+     payload.data.push(autoObj);
+
+    }
+
+     c++;
+  }
+
+  //Stringify for use in client-side JS
+  var json = Stringify(payload);
+
+
+  //prepares the date for display in dashboard
+  function formatDate(myDate) {
+    if(typeof(myDATE) !== null) {
+    var month = (myDate.getMonth() + 1),
+    day = myDate.getDate(),
+    year = myDate.getFullYear(),
+    hour = myDate.getHours(),
+    mins = myDate.getMinutes(),
+    meridiem = '';
+    
+    if (hour > 12) {
+      hour = Number(hour) - 12;
+      meridiem = 'PM'
+    } else {
+      meridiem = 'AM';
+    }
+    
+    return ('0' + month).slice(-2)  + '/' + ('0' + day).slice(-2)  + '/' + year  + ' ' + ('0' + hour).slice(-2)   + ':' + ('0' + mins).slice(-2) + ' ' + meridiem;
+    } else { return '';}
+  }
+
+  //gets a JSON of all automations inside of Business Unit
+  function getAutomations(tenantID,authToken) {
+
+    var url = 'https://' + tenantID + '.rest.marketingcloudapis.com/legacy/v1/beta/bulk/automations/automation/definition/';
+    var req = new Script.Util.HttpRequest(url);
+    req.emptyContentHandling = 0;
+    req.retries = 2;
+    req.continueOnError = true;
+    req.contentType = "application/json"
+    req.setHeader("Authorization", authToken);
+    req.method = "GET";
+
+    var resp = req.send();
+
+    var resultStr = String(resp.content);
+    var resultJSON = Platform.Function.ParseJSON(String(resp.content));
+
+    return resultJSON;
+  }
+
+</script>
+
+<!DOCTYPE html>
+<html lang="en" class="fuelux">
+  <head>
+     <!-- Required meta tags -->
+     <meta charset="utf-8">
+     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" crossorigin="anonymous">
+     <link rel="stylesheet" href="https://cdn.datatables.net/1.10.20/css/dataTables.bootstrap.min.css" crossorigin="anonymous">
+  </head>
+  <body>
+    <script runat=server>
+
+      var expire = new Date()
+      expire.setMonth(expire.getMonth() - 6)
+
+      var c = 0;
+
+    </script>
+
+    <div style="width:90%; padding:20px 0 20px 0; margin:0 auto;">
+      <button id="exportBtn" onclick="download()">Export Data</button>
+      <table id="autoTable" class="table table-striped table-bordered table-hover">
+        <thead class="thead-dark">
+          <tr>
+            <th style="display:none;">AutoID</th>
+            <th style="display:none;">Client</th>
+            <th scope="col">name</th>
+            <th scope="col">status</th>
+            <th scope="col">ModifiedDate</th>
+            <th scope="col">lastRunDate</th>
+            <th>NextRun</th>
+            <th scope="col">stepcount</th>
+            <th scope="col">type</th>
+            <th scope="col">lastrunstatus</th>
+            <th scope="col">duration</th>
+          </tr>
+        </thead>
+      </table>
+    </div>
+    <script type="text/javascript" language="javascript" src="https://code.jquery.com/jquery-3.5.1.js" ></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.18.1/moment.min.js" ></script>    
+    <script type="text/javascript" language="javascript" src="https://cdn.datatables.net/1.10.21/js/jquery.dataTables.min.js"></script>
+    <script type="text/javascript" language="javascript" src="https://cdn.datatables.net/buttons/1.6.2/js/dataTables.buttons.min.js"></script>
+    <script type="text/javascript" language="javascript" src="https://cdn.datatables.net/select/1.3.1/js/dataTables.select.min.js"></script>
+    <script type="text/javascript" language="javascript" src="https://cdn.datatables.net/plug-ins/1.10.21/dataRender/datetime.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js" integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo" crossorigin="anonymous"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js" integrity="sha384-wfSDF2E50Y2D1uUdj0O3uMBJnjuUD4Ih7YwaYd1iqfktj0Uod8GCExl3Og8ifwB6" crossorigin="anonymous"></script>
+    <script src="https://cdn.datatables.net/1.10.20/js/dataTables.bootstrap.min.js" crossorigin="anonymous"></script>
+
+    <script>
+
+      let currentUrl = document.referrer;
+      let autoURL = currentUrl + 'cloud/#app/Automation Studio/AutomationStudioFuel3/%23Instance/';
+
+      let myJSON = <ctrl:var name=json />;
+
+      function buildAutoTable() {
+        let autoTable = $('#autoTable').DataTable( {
+             "data": myJSON.data,
+             "processing": true,
+             "language": {
+              "loadingRecords": "&nbsp;",
+              "processing": 'Loading...'
+             },
+             "paging": true,
+             "pageLength": 20,
+             "lengthMenu": [ [10, 20, 50, -1], [10, 20, 50, "All"] ],
+             "search": { "caseInsensitive": false },
+             "columns": [
+               {"data": "AutoID",
+                "visible":false
+               },
+               {"data": "ClientID",
+                "visible":false
+               },
+               {"data": "Name",
+                 "render": function(data, type, row, meta){
+                    if(type === 'display'){
+                        data = '<a href="' + autoURL + row["AutoID"] + '" target="_blank" >' + data + '</button>';
+                    }           
+                    return data;
+                 }
+               },
+               {"data": "Status"},
+               {"data": "modifiedDate", "type": 'date-mm-dd-yyyy'},
+               {"data": "LastRunDate"},
+               {"data": "NextRun",
+                 "render": function(data, type, row, meta){
+                    if(type === 'display'){
+                        data = data == '12/31/1969 06:00 PM' ? '' : data;
+                    }           
+                    return data;
+                 }
+               },
+               {"data": "StepCount"},
+               {"data": "Type"},
+               {"data": "LastRunStatus"},
+               {"data": "lastRunDuration"}
+             ] 
+        } ); 
+        return autoTable;
+      }
+
+      $(document).ready(function() {
+        let autoTable = buildAutoTable();
+      });
+
+    </script>
+
+    <script>
+      //Export CSV JS
+      function download() {
+        let csv = '';
+        let items = myJSON.data;
+
+        // Loop the array of objects
+        for(let i = 0; i < items.length; i++){
+            let numKeys = Object.keys(items[i]).length
+            let counter = 0
+
+            // If this is the first row, generate the headings
+            if(i === 0){
+
+               // Loop each property of the object
+               for(let key in items[i]){
+
+                                   // This is to not add a comma at the last cell
+                                   // The '\r\n' adds a new line
+                   csv += key + (counter+1 < numKeys ? ',' : '\r\n' )
+                   counter++
+               }
+            }else{
+               for(let key in items[i]){
+                   let data = items[i][key];
+
+                   data = data == '12/31/1969 06:00 PM' ? '' : data;
+
+                   csv += data + (counter+1 < numKeys ? ',' : '\r\n' )
+                   
+                   counter++
+               }
+            }
+
+        }
+
+        // Once we are done looping, download the .csv by creating a link
+        let link = document.createElement('a')
+        link.id = 'download-csv'
+        link.setAttribute('href', 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv));
+        link.setAttribute('download', 'AutoDashExport.csv');
+        document.body.appendChild(link)
+        document.querySelector('#download-csv').click()
+      }
+    </script>
+  </body>
+</html>
