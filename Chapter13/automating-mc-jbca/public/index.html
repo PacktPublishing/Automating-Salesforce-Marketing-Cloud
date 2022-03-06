@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title></title>
+    <meta charset="utf-8" />
+    <meta http-equiv="x-ua-compatible" content="ie=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="css/styles.css">
+    <script src="https://code.jquery.com/jquery-3.3.1.min.js" integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=" crossorigin="anonymous"></script>
+    <script type="text/javascript" src="js/require.js"></script>
+    <script type="text/javascript">
+        (function() {
+            var config = {
+                baseUrl: 'js'
+            };
+
+            var dependencies = [
+                'customActivity'
+            ];
+
+            require(config, dependencies);
+        })();
+    </script>
+</head>
+<body>
+    <div id="step1" class="step">
+        <div class="slds-grid">
+
+            <main class="slds-col">
+                <div class="wrapper fadeInDown">
+                    <div id="formContent">
+                        <!-- Tabs Titles -->
+                        <h2 class="active">Post Data To CloudPage</h2>
+
+                        <!-- Icon -->
+                        <div class="fadeIn first">
+                            <img src="images/iconLarge.png" id="icon" alt="Icon" />
+                        </div>
+
+                        <!-- CloudPage Form -->
+                        <form>
+                            <input type="text" id="cpURL" class="fadeIn second" name="cpURL" placeholder="CloudPage URL">
+                        </form>
+                    </div>
+                </div>
+            </main>
+
+        </div>
+
+    </div>
+</body>
+</html>

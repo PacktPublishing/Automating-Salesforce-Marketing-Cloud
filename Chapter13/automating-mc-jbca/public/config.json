@@ -1,0 +1,73 @@
+{
+    "workflowApiVersion": "1.1",
+    "metaData": {
+        "icon": "images/iconMedium.png",
+        "iconSmall": "images/iconSmall.png",
+        "category": "custom"
+    },
+    "type": "REST",
+    "lang": {
+        "en-US": {
+         "name": "CloudPage POST",
+          "description": "Sample Journey Builder Custom Activity",
+          "step1Label": "Configure Activity"
+        }
+    },
+    "arguments": {
+        "execute": {
+           "inArguments":[
+                {"subscriberKey":"{{Contact.Key}}"}
+            ],
+          "outArguments": [],
+          "url": "https://automating-mc-jbca.herokuapp.com/journeybuilder/execute",
+           "verb": "POST",
+            "body": "",
+            "header": "",
+            "format": "json",
+            "useJwt": true,
+            "timeout": 10000,
+            "retryCount": 5,
+            "retryDelay": 100
+        }
+    },
+    "configurationArguments": {
+      "save": {
+        "url": "https://automating-mc-jbca.herokuapp.com/journeybuilder/save",
+          "verb": "POST",
+        "useJwt": true
+       },
+       "publish": {
+        "url": "https://automating-mc-jbca.herokuapp.com/journeybuilder/publish",
+           "verb": "POST",
+        "useJwt": true
+       },
+      "stop": {
+        "url": "https://automating-mc-jbca.herokuapp.com/journeybuilder/stop",
+           "verb": "POST",
+        "useJwt": true
+      },
+      "validate": {
+        "url": "https://automating-mc-jbca.herokuapp.com/journeybuilder/validate",
+        "verb": "POST",
+        "useJwt": true
+      }
+    },
+    "wizardSteps": [
+        { "label": "Configure Activity", "key": "step1" }
+    ],
+    "userInterfaces": {
+        "configModal": {
+            "height": 640,
+            "width": 900,
+          "fullscreen": false
+        }
+    },
+    "schema": {
+        "arguments": {
+            "execute": {
+                "inArguments": [],
+                "outArguments": []
+            }
+        }
+    }
+}
