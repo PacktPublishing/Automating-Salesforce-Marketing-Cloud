@@ -1,0 +1,38 @@
+<aura:component implements="flexipage:availableForAllPageTypes" access="global">
+  <aura:attribute name="searchId" type="String" default="" />
+  <aura:attribute name="searchResults" type="String[]" />
+  <div class="table-search">
+    <lightning:input
+      type="text"
+      name="email-search"
+      placeholder="Enter A PersonContactId To Search
+Data Extension"
+      value="{!v.searchId}"
+    />
+    <div class="search-icon" onclick="{!c.searchSubmit}">
+      <lightning:icon
+        iconName="utility:search"
+        alternativeText="Search"
+        size="small"
+      />
+    </div>
+    <aura:if isTrue="{!not(empty(v.searchResults))}">
+      <table>
+        <thead>
+          <tr>
+            <th>PersonContactId</th> <th>Activity Type</th>
+            <th>ActivityDate</th> <th>ActivityResult</th>
+          </tr>
+        </thead>
+        <tbody>
+          <aura:iteration items="{!v.searchResults}" var="row">
+            <tr>
+              <td>{!row.personcontactid}</td> <td>{!row.activitytype}</td>
+              <td>{!row.activitydate}</td> <td>{!row.activityresult}</td>
+            </tr>
+          </aura:iteration>
+        </tbody>
+      </table>
+    </aura:if>
+  </div>
+</aura:component>
