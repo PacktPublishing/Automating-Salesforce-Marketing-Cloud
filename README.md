@@ -59,3 +59,7 @@ We also provide a PDF file that has color images of the screenshots/diagrams use
 
 **Jason Hanshaw**
 is a Salesforce Marketing Cloud engineer with extensive experience in building solutions for the platform. A former web developer, he brings a background in web application development to Marketing Cloud in order to build innovative solutions that extend capabilities and meet complex needs. He is the author of the blog InvokeCreate.dev where he shares project-based examples for getting the most out of the platform. Jason is an avid contributor on Stack Exchange and within digital marketing communities, and is always seeking to grow his knowledge and share his own with others.
+### Download a free PDF
+
+ <i>If you have already purchased a print or Kindle version of this book, you can get a DRM-free PDF version at no cost.<br>Simply click on the link to claim your free PDF.</i>
+<p align="center"> <a href="https://packt.link/free-ebook/9781803237190">https://packt.link/free-ebook/9781803237190 </a> </p>
